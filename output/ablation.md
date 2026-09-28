@@ -1,0 +1,60 @@
+# LeNet-5 MNIST 消融实验
+
+> 一、消融实验读数（2026-09-17 跑）
+> 二、落盘权重全量复核实测（2026-09-28 用 10000 张测试集重测）
+> 三、复现方式（**含一个会覆盖权重的坑，务必看**）
+
+## 一、消融实验读数（2026-09-17）
+
+| 编号 | 配置 | 增强 | 激活 | 池化 | 优化器/调度 | 实跑轮数 | 验证集 | 测试集 | 耗时 |
+|---|---|---|---|---|---|---|---|---|---|
+| E0 | 基线 · 论文原版 | 否 | tanh | avg | adam/step | 11 | 98.94% | **98.89%** | 209s |
+| E1 | E0 + 数据增强 | 是 | tanh | avg | adam/step | 15 | 99.30% | **99.32%** | 376s |
+| E2 | E1 + AdamW/Cosine/标签平滑 | 是 | tanh | avg | adamw/cosine | 15 | 99.40% | **99.34%** | 378s |
+| E3 | E2 + ReLU/MaxPool（结构变体） | 是 | relu | max | adamw/cosine | 15 | 99.36% | **99.33%** | 387s |
+
+- 基线 E0 测试集准确率 98.89%
+- 最优配置 **E2**（E1 + AdamW/Cosine/标签平滑），测试集 99.34%，相对基线 +0.45 个百分点
+- 全部实验固定 seed=42，验证集 5000 条（从训练集切分），测试集仅用于最终报告
+
+## 二、落盘权重复核实测（2026-09-28，全量 10000 张）
+
+`output/` 下实际存在 4 个权重（含 9-28 新增的兜底副本）。重测结果与权重自带记录逐一对上：
+
+| 文件 | 架构 | 参数量 | 权重自带记录 | 实测 |
+|---|---|---|---|---|
+| `lenet5_mnist_base.pth` | LeNet5（tanh / avg） | 61,706 | — | **98.84%** |
+| `lenet5_mnist.pth` | LeNet5（tanh / avg）+ 增强 + AdamW/Cosine/标签平滑 | 61,706 | `test_acc=99.34` | **99.34%** |
+| `lenet5_mnist_E2_99.34.pth` | 同上，兜底副本（防重跑覆盖） | 61,706 | 同左 | **99.34%** |
+| `lenet5_mnist_v2.pth` | **LeNet5BN**（BN + ReLU + MaxPool） | 62,614 | `test_acc=99.46` | **99.46%** |
+
+- `lenet5_mnist.pth` 的 `meta` 字段完整记录了配置，可直接查：
+  `act=tanh, pool=avg, augment=true, optim=adamw, sched=cosine, label_smoothing=0.05,`
+  `lr=1e-3, weight_decay=1e-4, batch_size=64, epochs_run=15, best_epoch=13,`
+  `val_acc=99.4, test_acc=99.34, seed=42, seconds=378.5` —— 即上表的 **E2**，实测复现一致。
+- **E0 / E1 / E3 的权重都没有落盘**（当时只留了 E2）。所以 E0=98.89% 无法用现存权重复现，
+  它是独立一次跑的读数；`lenet5_mnist_base.pth` 则是另一次"改动前"留存权重，实测 98.84%。
+  **两个基线数都真实，但不是同一次运行**，对外引用要说清是哪一个。
+- `lenet5_mnist_v2.pth` 来自 `lenet5_improved.py`（BN + ReLU/MaxPool + 25 epoch + Cosine + TTA），
+  是**换过结构的另一条线，不是"论文原版 LeNet-5"**。它 99.46% 高于 E3 的 99.33%，
+  说明：**在经典结构上单独换 ReLU/MaxPool 没有收益（E3），但再加 BatchNorm 才有增益（v2）**。
+
+## 三、复现方式
+
+```bash
+C:\Python313\python.exe lenet5_mnist.py        # 默认 10 epoch
+```
+
+> ⚠️ **先别直接跑这条命令**：当前脚本的默认配置是
+> `optim.Adam(lr=1e-3) + StepLR(step_size=5, gamma=0.5) + CrossEntropyLoss（无标签平滑）`、
+> 默认 `NUM_EPOCHS=10`，**已经不等于 E2**（脚本也没有暴露 `--optim/--sched/--label-smoothing` 开关），
+> 而它保存的路径正是 `output/lenet5_mnist.pth` —— **跑一次就会用低配置覆盖掉现有的 99.34% 权重**，
+> 而 `web_demo.py` 和简历引用的都是这个文件。
+> 要重跑：先备份，或加 `--out-dir` 输出到别处。已留兜底副本 `output/lenet5_mnist_E2_99.34.pth`。
+
+要复现 E2，需要把脚本临时改成 `AdamW(lr=1e-3, weight_decay=1e-4)` +
+`CosineAnnealingLR` + `CrossEntropyLoss(label_smoothing=0.05)`，并 `--epochs 15`，
+同时保留 `train_transform` 里的 `RandomAffine`。
+
+曲线与图片：`output/ablation.png`、`output/training_curves.png`、
+`output/training_curves_v2.png`、`output/sample_predictions.png`、`output/single_test.png`

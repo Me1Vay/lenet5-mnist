@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 数据集（torchvision 会自动下载）
+data/
+MNIST/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 训练中间产物（保留 output/ 里的权重与图表，见 .gitignore 上方未排除）
+*.log
