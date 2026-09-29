@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 LeNet-5 MNIST 手写数字识别
-源自 Notebook 导出（手写数字识别lenet.html），为 Windows 本地运行做了适配：
+经典 LeNet-5（LeCun et al., 1998）在 MNIST 上的实现。
+最初源自学校实训课程的 notebook 练习，本项目在其基础上做了以下改造：
   1. DataLoader 多进程包进 main() 守卫（Windows spawn 机制必需）
   2. matplotlib 无窗口时自动改为保存 PNG，不阻塞
   3. MNIST 下载多镜像回退，下载失败自动换源
