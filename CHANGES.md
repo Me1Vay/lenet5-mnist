@@ -85,13 +85,14 @@ C:\Python313\python.exe lenet5_mnist.py                 # 默认 10 epoch
 
 实验曲线与数据：`output/ablation.png`、`output/ablation.md`
 
-> ⚠️ **别直接跑这条命令**：当前脚本的默认配置是
-> `optim.Adam(lr=1e-3) + StepLR(step_size=5, gamma=0.5) + CrossEntropyLoss（无标签平滑）`、
-> `NUM_EPOCHS=10`，**已经不等于 E2**（脚本也没暴露 `--optim/--sched/--label-smoothing`），
-> 而它保存的路径正是 `output/lenet5_mnist.pth` ——
-> **跑一次就会用低配置覆盖掉现有的 99.34% 权重**，而 `web_demo.py` 和简历引用的都是这个文件。
-> 要重跑请先备份，或加 `--out-dir` 输出到别处。兜底副本已放在
-> `output/lenet5_mnist_E2_99.34.pth`。
+> ✅ **默认配置已对齐 E2**（2026-09-29 修订）：`lenet5_mnist.py` 现在默认就是
+> `AdamW(lr=1e-3, weight_decay=1e-4)` + `CosineAnnealingLR` + `CrossEntropyLoss(label_smoothing=0.05)`、
+> 15 epoch，并从训练集切 5000 条验证集、按验证集挑最优 epoch（测试集只在最后评估一次）。
+> 直接 `python lenet5_mnist.py` 即可复现 E2。
+>
+> 同时加了**防覆盖保护**：保存前检查同名 `.pth` 是否存在，默认**拒绝覆盖**（加 `--force` 才覆盖，
+> 或用 `--out-dir` 另存）。保存的权重带 `meta` 字段记录完整配置。
+> 兜底副本仍保留在 `output/lenet5_mnist_E2_99.34.pth`。
 
 ## 备份
 

@@ -45,16 +45,26 @@
 C:\Python313\python.exe lenet5_mnist.py        # 默认 10 epoch
 ```
 
-> ⚠️ **先别直接跑这条命令**：当前脚本的默认配置是
-> `optim.Adam(lr=1e-3) + StepLR(step_size=5, gamma=0.5) + CrossEntropyLoss（无标签平滑）`、
-> 默认 `NUM_EPOCHS=10`，**已经不等于 E2**（脚本也没有暴露 `--optim/--sched/--label-smoothing` 开关），
-> 而它保存的路径正是 `output/lenet5_mnist.pth` —— **跑一次就会用低配置覆盖掉现有的 99.34% 权重**，
-> 而 `web_demo.py` 和简历引用的都是这个文件。
-> 要重跑：先备份，或加 `--out-dir` 输出到别处。已留兜底副本 `output/lenet5_mnist_E2_99.34.pth`。
+> ✅ **已修复**（2026-09-29）：`lenet5_mnist.py` 的默认配置现已对齐 E2，并加了防覆盖保护。
+> 下面这段风险记录保留，作为"默认配置与实验配置脱节"这个坑的存档。
 
-要复现 E2，需要把脚本临时改成 `AdamW(lr=1e-3, weight_decay=1e-4)` +
-`CosineAnnealingLR` + `CrossEntropyLoss(label_smoothing=0.05)`，并 `--epochs 15`，
-同时保留 `train_transform` 里的 `RandomAffine`。
+> ⚠️ **历史上的风险（现已修复）**：旧版脚本默认是
+> `optim.Adam(lr=1e-3) + StepLR(step_size=5, gamma=0.5) + CrossEntropyLoss（无标签平滑）`、
+> `NUM_EPOCHS=10`，**不等于 E2**，而它保存的路径正是 `output/lenet5_mnist.pth` ——
+> 直接跑会用低配置覆盖掉 99.34% 的权重（`web_demo.py` 引用的就是它）。
+> 现已在保存前加**存在性检查，默认拒绝覆盖**（加 `--force` 才覆盖，或 `--out-dir` 另存）。
+> 兜底副本：`output/lenet5_mnist_E2_99.34.pth`。
+
+**当前复现方式**：直接跑默认配置即可 ——
+
+```bash
+python lenet5_mnist.py                 # 默认 = E2，跑完打印验证集与测试集准确率
+```
+
+脚本默认值：`AdamW(lr=1e-3, weight_decay=1e-4)` + `CosineAnnealingLR` +
+`CrossEntropyLoss(label_smoothing=0.05)`、15 epoch、seed 42、训练集切 5000 条做验证集、
+按验证集挑最优 epoch 保存（测试集只在最后评估一次）。
+训练完保存的 `.pth` 带 `meta` 字段，记录完整配置与实际成绩，可直接核对。
 
 曲线与图片：`output/ablation.png`、`output/training_curves.png`、
 `output/training_curves_v2.png`、`output/sample_predictions.png`、`output/single_test.png`

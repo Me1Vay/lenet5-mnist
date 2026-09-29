@@ -60,16 +60,31 @@ python web_demo.py
 **复现实验**：
 
 ```bash
-python lenet5_mnist.py              # 默认 10 epoch
-python lenet5_improved.py           # 增强版（BN + ReLU/MaxPool + 25 epoch），跑完打印普通/TTA 两档精度
+python lenet5_mnist.py              # 默认即上表的 E2
+python lenet5_improved.py           # 另一条线：LeNet5BN（BatchNorm）+ 25 epoch + TTA
 ```
 
 MNIST 数据集会在首次运行时自动下载（多镜像回退）。
 
-> ⚠️ **注意**：`lenet5_mnist.py` 当前默认仍是 `Adam + StepLR`、10 epoch，**不等于上表的 E2**，
-> 而它的保存路径正是 `output/lenet5_mnist.pth` —— 直接跑会覆盖掉仓库里那份 99.34% 的权重。
-> 重跑前请先备份，或加 `--out-dir` 输出到别处。复现 E2 需要改成
-> `AdamW(lr=1e-3, weight_decay=1e-4)` + `CosineAnnealingLR` + `CrossEntropyLoss(label_smoothing=0.05)` 并 `--epochs 15`。
+**`lenet5_mnist.py` 的默认超参就是消融表里的 E2**，可直接复现：
+
+| 项 | 默认值 | 对应 |
+|---|---|---|
+| 结构 | LeNet5（tanh / AvgPool） | 论文原版 |
+| 数据增强 | 训练集 RandomAffine(±10°, 平移/缩放, shear 5) | E1 |
+| 优化器 / 调度 | `AdamW(lr=1e-3, weight_decay=1e-4)` + `CosineAnnealingLR` | E2 |
+| 损失 | `CrossEntropyLoss(label_smoothing=0.05)` | E2 |
+| 轮数 / batch / seed | 15 / 64 / 42 | E2 |
+| 验证集 | 从训练集切 5000 条（train 55000 / val 5000） | E2 |
+
+训练全程**只看验证集**，并按验证集挑最优 epoch；**测试集只在最后评估一次**，不参与任何决策。
+上表所有项都可用命令行覆盖：`--epochs --lr --weight-decay --label-smoothing --val-size --seed --batch-size`。
+
+> 🛡️ **权重有防覆盖保护**：保存前检查同名 `.pth` 是否已存在，**默认拒绝覆盖**并给出提示。
+> 确认要覆盖加 `--force`，想另存加 `--out-dir <目录>`。
+>
+> 新保存的权重带 `meta` 字段，记录完整训练配置（结构 / 优化器 / 调度 / 学习率 / 轮数 /
+> 最优 epoch / 验证集与测试集准确率 / 种子 / 数据量 / 耗时），**拿到任何一个 `.pth` 都能自证来历**。
 
 ## 项目结构
 
